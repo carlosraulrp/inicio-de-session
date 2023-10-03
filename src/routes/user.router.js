@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const usuario = require('../models/User')
 const passport = require('passport')
-const jwt = require('jsonwebtoken')
+const initializePassport = require('../config/passport.config')
 const {createHash, isValidatePassword} = require('../../utils')
 
 
@@ -54,31 +54,23 @@ router.get("/failregister", async (req, res) => {
     res.send({ error: "Falla" })
 })
 
-router.post("/login", async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).render("login", { error: "Valores erroneos" });
+// Ruta para procesar el formulario de login utilizando Passport
+router.post("/login", passport.authenticate('local', {
+    successRedirect: '/profile', // Redirige al perfil si la autenticación es exitosa
+    failureRedirect: '/login',   // Redirige de nuevo al formulario de login si la autenticación falla
+}));
 
-    const user = await usuario.findOne({ email }, { first_name: 1, last_name: 1, age: 1, password: 1, email: 1 });
-
-    if (!user) {
-        return res.status(400).render("login", { error: "Usuario no encontrado" });
+// Ruta para mostrar el perfil del usuario (protegida)
+router.get("/profile", (req, res) => {
+    if (!req.isAuthenticated()) {
+        return res.redirect("/login"); // Redirige al formulario de login si el usuario no está autenticado
     }
 
-    if (!isValidatePassword(user, password)) {
-        return res.status(401).render("login", { error: "Error en password" });
-    }
+    const { first_name, last_name, email, age } = req.user; // Usa req.user para acceder al usuario autenticado
 
-    // Set the user session here if login is successful
-    req.session.user = {
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        age: user.age
-    };
+    res.render("profile", { first_name, last_name, age, email });
+});
 
-    // Redirect the user after successful login
-    res.redirect("/api/sessions/profile");
-})
 
 
 module.exports = router;
